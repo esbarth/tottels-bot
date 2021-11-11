@@ -46,7 +46,7 @@ def timestamp():
     print(datetime.datetime.now().strftime("%A, %d. %B %Y %I:%M%p"))
 
 
-def load_yaml(filename):
+def load_yaml(yamlkey.txt):
     """
     File should contain:
     consumer_key: QLtH7XGp8pCweIjqu9R76ivxi
