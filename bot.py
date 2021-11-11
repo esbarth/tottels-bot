@@ -1,21 +1,11 @@
 # tottels-bot
-https://github.com/esbarth/tottels-bot
-import tweepy
-import random
-import time
-import sys
-import os
-from textgenrnn import textgenrnn
 
-# Simple Twitter bot
 # This bot constructs random tweets using a neural network provided by textgenrnn
 # It can also tweet every t seconds based on user args
 
 # @author Emily Barth
 # @date 11/11/2021
 # Check out my github at https://github.com/esbarth
-# textgenrnn documentation can be found at https://github.com/esbarth/tottels-bot
-# keras documentation can be found at
 
 #!/usr/bin/env python
 """
