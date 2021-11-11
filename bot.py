@@ -21,8 +21,8 @@ from textgenrnn import textgenrnn
 
 consumer_key = 'QLtH7XGp8pCweIjqu9R76ivxi'
 consumer_secret = 'bkKM7WgLWin46udwvk8ZWFGDK9GYP2MhalGcJLUYytgYEvi5kV'
-access_token = 'AAAAAAAAAAAAAAAAAAAAABbBVgEAAAAAp1wlTOUngHdfYkonoRrZ%2Fo1jMBQ%3DnjcHRKATm5wNT8bU4yS9IU8RUO2VPYF1QjBCtG07q3P8Nrb5Ah'
-access_token_secret = 'AAAAAAAAAAAAAAAAAAAAABbBVgEAAAAAp1wlTOUngHdfYkonoRrZ%2Fo1jMBQ%3DnjcHRKATm5wNT8bU4yS9IU8RUO2VPYF1QjBCtG07q3P8Nrb5Ah'
+access_token = '1457755087971966980-aJl398na3NWlNkx3rP21vxKY7l0sg5'
+access_token_secret = 'Ci0tK1i4rHwyIPALkbyc2i4SphNk9C2KWK6v7ixwzC9WW'
 
 
 auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
