@@ -17,76 +17,221 @@ from textgenrnn import textgenrnn
 # textgenrnn documentation can be found at https://github.com/esbarth/tottels-bot
 # keras documentation can be found at
 
-# API set up
+#!/usr/bin/env python
+"""
+Tweet a random line from a text file.
+For example, use it to tweet a random six-word sentence from Project Gutenberg.
+https://twitter.com/sixworderbot
+"""
+try:
+    import resource
 
-consumer_key = 'QLtH7XGp8pCweIjqu9R76ivxi'
-consumer_secret = 'bkKM7WgLWin46udwvk8ZWFGDK9GYP2MhalGcJLUYytgYEvi5kV'
-access_token = '1457755087971966980-aJl398na3NWlNkx3rP21vxKY7l0sg5'
-access_token_secret = 'Ci0tK1i4rHwyIPALkbyc2i4SphNk9C2KWK6v7ixwzC9WW'
+    mem0 = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 * 1024.0)
+except ImportError:
+    # resource not on Windows
+    pass
+
+import argparse
+import random
+import sys
+import twitter
+import webbrowser
+import yaml
+
+TWITTER = None
+
+SEPERATORS = [" ", " ", " ", " ", "\n", "\n", "\n\n"]
 
 
-auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
-auth.set_access_token(access_token, access_token_secret)
-api = tweepy.API(auth)
+# cmd.exe cannot do Unicode so encode first
+def print_it(text):
+    print(text.encode("utf-8"))
 
-def check_followers():
-    followers = []
-    for follower in tweepy.Cursor(api.followers).items():
-        followers.append(follower)
 
-    print ("Found %s followers, finding friends.." % len(followers))
-    friends = []
-    for friend in tweepy.Cursor(api.friends).items():
-        friends.append(friend)
+def timestamp():
+    if args.quiet:
+        return
+    import datetime
 
-    # creating dictionaries based on id's is handy too
+    print(datetime.datetime.now().strftime("%A, %d. %B %Y %I:%M%p"))
 
-    friend_dict = {}
-    for friend in friends:
-        friend_dict[friend.id] = friend
 
-    follower_dict = {}
-    for follower in followers:
-        follower_dict[follower.id] = follower
+def load_yaml(filename):
+    """
+    File should contain:
+    consumer_key: QLtH7XGp8pCweIjqu9R76ivxi
+    consumer_secret: bkKM7WgLWin46udwvk8ZWFGDK9GYP2MhalGcJLUYytgYEvi5kV
+    access_token: 1457755087971966980-aJl398na3NWlNkx3rP21vxKY7l0sg5
+    access_token_secret: Ci0tK1i4rHwyIPALkbyc2i4SphNk9C2KWK6v7ixwzC9WW
+    """
+    with open(tottels_bot.txt) as f:
+        data = yaml.safe_load(f)
 
-    # now we find all your "non_friends" - people who don't follow you
-    # even though you follow them.
+    keys = data.viewkeys() if sys.version_info.major == 2 else data.keys()
+    if not keys >= {
+        "access_token",
+        "access_token_secret",
+        "consumer_key",
+        "consumer_secret",
+    }:
+        sys.exit("Twitter credentials missing from YAML: " + filename)
 
-    non_followers = [friend for friend in friends if friend.id not in follower_dict] # people who are not following me but i am following them
-    not_yet_following = [follower for follower in followers if follower.id not in friend_dict] # people who are following me but i am not following them
-   
+    return data
 
-    for nf in non_followers:
-        nf.unfollow() # unfollow non followers
 
-    for nyf in not_yet_following:
-        nyf.follow()
-        api.update_status(status="Thanks for the follow @%s" % (nyf.screen_name))  # Saying hello to new followers
-       
+def get_twitter():
+    global TWITTER
 
-def status_update(textgen, timer, upper_limit): # Updates the status
-    counter = 0
-    while counter < upper_limit:
-        check_followers()
+    if TWITTER is None:
+        data = load_yaml(args.yaml)
 
-        api.update_status(status=''.join(textgen.generate(temperature=1, return_as_list=True, max_gen_length=280))) # Publishes tweet
-        counter += 1
-        time.sleep(timer) # Waits for specified time
+        # Create and authorise an app with (read and) write access at:
+        # https://dev.twitter.com/apps/new
+        # Store credentials in YAML file
+        TWITTER = twitter.Twitter(
+            auth=twitter.OAuth(
+                data["access_token"],
+                data["access_token_secret"],
+                data["consumer_key"],
+                data["consumer_secret"],
+            )
+        )
 
-def training(textgen, filename, e):
-    textgen.train_from_file([tottels bot.docx](https://github.com/esbarth/tottels-bot/files/7520964/tottels.bot.docx)
-()
-, num_epochs=int(e))
-    textgen.generate()
+    return TWITTER
 
-# Status updates based on args
-if len(sys.argv) == 1:
-    t = textgenrnn("textgenrnn_weights.hdf5")
-    status_update(t, 0, 1)
-elif sys.argv[1] == "train":
-    os.remove("textgenrnn_weights.hdf5")
-    t = textgenrnn()
-    training(t, sys.argv[2], sys.argv[3])
-else:
-    t = textgenrnn("textgenrnn_weights.hdf5")
-    status_update(t, int(sys.argv[1]), int(sys.argv[2]))
+
+def get_random_sentence_from_file():
+    with open(args.infile) as f:
+        lines = f.read().splitlines()
+
+    return random.choice(lines)
+
+
+def tweet_it(string, in_reply_to_status_id=None):
+    global TWITTER
+
+    if len(string) <= 0:
+        print("ERROR: trying to tweet an empty tweet!")
+        return
+
+    t = get_twitter()
+
+    if not args.quiet:
+        print_it("TWEETING THIS: " + string)
+
+    if args.test:
+        if not args.quiet:
+            print("(Test mode, not actually tweeting)")
+    else:
+        if not args.quiet:
+            print("POST statuses/update")
+        result = t.statuses.update(
+            status=string, in_reply_to_status_id=in_reply_to_status_id
+        )
+        url = (
+            "http://twitter.com/"
+            + result["user"]["screen_name"]
+            + "/status/"
+            + result["id_str"]
+        )
+        if not args.quiet:
+            print("Tweeted: " + url)
+        if not args.no_web:
+            webbrowser.open(url, new=2)  # 2 = open in a new tab, if possible
+
+
+def get_random_hashtag():
+    # CSV string to list
+    hashtags = args.hashtags.split(",")
+    # Replace "None" with None
+    hashtags = [None if x == "None" else x for x in hashtags]
+    # Return a random hashtag
+    return random.choice(hashtags)
+
+
+def main():
+    random_sentence = get_random_sentence_from_file()
+    print(random_sentence)
+
+    hashtag = get_random_hashtag()
+    if not hashtag:
+        tweet = random_sentence
+    else:
+        # 50% lowercase hashtag
+        if random.randint(0, 1) == 0:
+            hashtag = hashtag.lower()
+        # Random order of text and hashtag
+        things = [hashtag, random_sentence]
+        random.shuffle(things)
+        if not args.quiet:
+            print(">" + " ".join(things) + "<")
+        # Random separator between text and hashtag
+        tweet = random.choice(SEPERATORS).join(things)
+
+    if not args.quiet:
+        print(">" + tweet + "<")
+        print("Tweet this:\n", tweet)
+
+    try:
+        tweet_it(tweet)
+
+    except twitter.api.TwitterHTTPError as e:
+        print("*" * 80)
+        print(e)
+        print("*" * 80)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Tweet a random line from a text file.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "-y",
+        "--yaml",
+        default="/Users/hugo/Dropbox/bin/data/randomsentencebot.yaml",
+        # default='E:/Users/hugovk/Dropbox/bin/data/randomsentencebot.yaml',
+        help="YAML file location containing Twitter keys and secrets",
+    )
+    parser.add_argument(
+        "-i",
+        "--infile",
+        default="https://www.dropbox.com/s/5wbzgsaezuiwo4s/tottels_bot.txt",
+        # default='https://www.dropbox.com/s/5wbzgsaezuiwo4s/tottels_bot.txt',
+        help="A random line is chosen from this text file",
+    )
+    parser.add_argument(
+        "--hashtags",
+        default="#TottelsMiscellany",
+        help="Comma-separated list of random hashtags",
+    )
+    parser.add_argument(
+        "-nw",
+        "--no-web",
+        action="store_true",
+        help="Don't open a web browser to show the tweeted tweet",
+    )
+    parser.add_argument(
+        "-x",
+        "--test",
+        action="store_true",
+        help="Test mode: go through the motions but don't update anything",
+    )
+    parser.add_argument(
+        "-q", "--quiet", action="store_true", help="Only print out tweet (and errors)"
+    )
+    args = parser.parse_args()
+
+    timestamp()
+    main()
+
+# End of file
+
+
+
+
+
+
+
+
+
